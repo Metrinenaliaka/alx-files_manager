@@ -1,49 +1,44 @@
 import { MongoClient } from 'mongodb';
 
-async function connectToMongo(dbClient) {
-  await dbClient.client.connect();
-  dbClient.db = dbClient.client.db(dbName);
-}
+const HOST = process.env.DB_HOST || 'localhost';
+const PORT = process.env.DB_PORT || 27017;
+const DB = process.env.DB_DATABASE || 'files_manager';
+
+const url = `mongodb://${HOST}:${PORT}`;
 
 class DBClient {
   constructor() {
-    const url = process.env.DB_HOST || 'mongodb://localhost:27017';
-    const dbName = process.env.DB_DATABASE || 'files_manager';
-    this.client = new MongoClient(url, { useNewUrlParser: true, useUnifiedTopology: true });
-    this.db = null;
-    connectToMongo.call(this);
+    this.client = new MongoClient(url, { useUnifiedTopology: true, useNewUrlParser: true });
+    this.isConnected = false; // Flag to track connection status
+
+    this.client.on('connected', () => {
+      this.isConnected = true;
+      console.log('Connected to MongoDB');
+    });
+
+    this.client.on('error', (err) => {
+      console.error('Error connecting to MongoDB:', err);
+    });
+
+    this.client.connect();
   }
 
-  // async connectToMongo() {
-  //   await this.client.connect();
-  //   this.db = client.db(dbName);
-  // }
-
-  isAlive = async () => {
-    if (!this.db) {
-      await connectToMongo.call(this);
-    }
-    return this.db !== null;
+  isAlive() {
+    return this.client.isConnected();
   }
 
   async nbUsers() {
-    try {
-      const value = await this.client.db(process.env.DB_DATABASE || 'files_manager').collection('users').countDocuments();
-      return value;
-    } catch (error) {
-      return 0;
-    }
+    const users = this.db.collection('users');
+    const usersNum = await users.countDocuments();
+    return usersNum;
   }
 
   async nbFiles() {
-    try {
-      const value = await this.client.db(process.env.DB_DATABASE || 'files_manager').collection('files').countDocuments();
-      return value;
-    } catch (error) {
-      return 0;
-    }
+    const files = this.db.collection('files');
+    const filesNum = await files.countDocuments();
+    return filesNum;
   }
 }
 
 const dbClient = new DBClient();
-export default dbClient;
+module.exports = dbClient;
